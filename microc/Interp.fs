@@ -233,6 +233,10 @@ let initEnvAndStore (topdecs: topdec list) : locEnv * funEnv * store =
             let (locEnv1, sto1) = allocate (typ, x) locEnv store
             addv decr locEnv1 funEnv sto1
 
+        | VardecAndAssign (typ, x, e) :: decr ->
+            let (locEnv1, sto1) = allocate (typ, x) locEnv  store
+            addv decr locEnv1 funEnv  sto1
+
         //全局函数 将声明(f,(xs,body))添加到全局函数环境 funEnv
         | Fundec (_, f, xs, body) :: decr -> addv decr locEnv ((f, (xs, body)) :: funEnv) store
 
@@ -293,7 +297,11 @@ and stmtordec stmtordec locEnv gloEnv store =
     match stmtordec with
     | Stmt stmt -> (locEnv, exec stmt locEnv gloEnv store)
     | Dec (typ, x) -> allocate (typ, x) locEnv store
-
+    | DecAndAssign (typ, x, e) ->
+        let (locEnv1, store1) = allocate (typ, x) locEnv  store
+        let (res, store2) = eval (Assign(AccVar x, e)) locEnv1 gloEnv  store1
+        (locEnv1, store2)
+        
 (* Evaluating micro-C expressions *)
 
 and eval e locEnv gloEnv store : int * store =
