@@ -23,14 +23,17 @@ let third  (_, _, c) = c
 %token <int> CSTINT CSTBOOL  // <int> 是词元的语义值类型
 %token <string> CSTSTRING NAME
 %token <char> CSTCHAR
+%token <float32> CSTFLOAT
 
 %token IF SWITCH CASE DEFAULT
 %token WHILE FOR DO
-%token CHAR ELSE INT NULL PRINT PRINTLN RETURN VOID STRING 
+%token SELFINC SELFDEC
+%token CHAR ELSE INT NULL PRINT PRINTLN RETURN VOID STRING BOOL FLOAT
 %token PLUS MINUS TIMES DIV MOD
 %token EQ NE GT LT GE LE
 %token NOT SEQOR SEQAND
 %token LPAR RPAR LBRACE RBRACE LBRACK RBRACK SEMI COMMA ASSIGN AMP POINT COLON QUES
+%token BITXOR BITOR BITAND BITLEFT BITRIGHT
 %token EOF
 
 %right ASSIGN             /* lowest precedence */  // 最下面的优先级最高
@@ -38,11 +41,12 @@ let third  (_, _, c) = c
 %nonassoc COLON QUES // ? :
 %left SEQOR
 %left SEQAND
+%left BITXOR BITOR BITAND BITLEFT BITRIGHT 
 %left EQ NE 
 %nonassoc GT LT GE LE
 %left PLUS MINUS
 %left TIMES DIV MOD 
-%nonassoc NOT AMP 
+%nonassoc NOT AMP SELFINC SELFDEC
 %nonassoc LBRACK          /* highest precedence  */
 
 %start Main            // 语法开始符号
@@ -199,6 +203,15 @@ ExprNotAccess:
   | Expr SEQAND Expr                    { Andalso($1, $3)     }
   | Expr SEQOR  Expr                    { Orelse($1, $3)      }
   | Expr QUES Expr COLON Expr           { Prim3($1, $3, $5)   } //  三目
+  | Expr AMP Expr                       { Prim2("&", $1, $3)  } 
+  | Expr BITOR  Expr                    { Prim2("|", $1, $3)  }
+  | Expr BITXOR  Expr                   { Prim2("^", $1, $3)  }
+  | Expr BITLEFT  Expr                  { Prim2("<<", $1, $3) }
+  | Expr BITRIGHT  Expr                 { Prim2(">>", $1, $3) }
+  | SELFINC Access                       { PreInc $2          } 
+  | SELFDEC Access                       { PreDec $2          } 
+  | Access SELFINC                       { NextInc $1         } 
+  | Access SELFDEC                       { NextDec $1         } 
 ;
 
 
@@ -210,6 +223,7 @@ AtExprNotAccess:
     Const                               { CstI $1             }
   | ConstChar                           { CstC $1             }
   | ConstString                         { CstS $1             }
+  | ConstFloat                          { CstF $1             }
   | LPAR ExprNotAccess RPAR             { $2                  } 
   | AMP Access                          { Addr $2             } // 取地址
 ;
@@ -247,8 +261,15 @@ ConstString:
     CSTSTRING                           { $1       }
 ;
 
+ConstFloat:
+    CSTFLOAT                             { $1      }
+  | MINUS CSTFLOAT                       { - $2    }
+;
+
 Type:
     INT                                 { TypI     }
   | CHAR                                { TypC     }
   | STRING                              { TypS     }
+  | BOOL                                { TypB     }
+  | FLOAT                               { TypF     }
 ;

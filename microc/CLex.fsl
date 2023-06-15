@@ -68,6 +68,7 @@ let HexToDec value =
 // keyword 处理关键字与标识符的辅助函数
 let keyword s =   
     match s with
+    | "bool"    -> BOOL
     | "char"    -> CHAR    // 返回对应的Token ,Token 定义于 CPar.fsl 文件中
     | "else"    -> ELSE
     | "false"   -> CSTBOOL 0
@@ -87,6 +88,7 @@ let keyword s =
     | "do"      -> DO
     | "while"   -> WHILE
     | "String"  -> STRING 
+    | "float"   -> FLOAT
     | _         -> NAME s   // 缺省情况，是标识符的名字，如 函数名，变量名等
                             // 当所有的关键字没有匹配成功时，则当成标识符
 
@@ -129,6 +131,9 @@ rule Token = parse          // 每个 规则rule 会生成为一个函数，函�
                             //  System.Int32.Parse 将 字符串转换为 int 类型
                             // 在 CPar 中  词元CSTINT 的语义值的类型是int  %token <int> CSTINT
                             //  CSTINT 需要一个整数作为参数
+  
+  | ['0'-'9']+'.'['0'-'9']+ 
+                    { CSTFLOAT (System.Single.Parse (lexemeAsString lexbuf)) }
 
   | "0"['B''b']['0'-'1']+                { CSTINT (BinToDec(System.Int32.Parse (Base (lexemeAsString lexbuf))))}    
   | "0"['O''o']['0'-'7']+                { CSTINT (OctToDec(System.Int32.Parse (Base (lexemeAsString lexbuf)))) }
@@ -154,7 +159,13 @@ rule Token = parse          // 每个 规则rule 会生成为一个函数，函�
   | "||"            { SEQOR }                     
   | "&&"            { SEQAND }                     
   | "&"             { AMP }                     
-  | "!"             { NOT }                     
+  | "!"             { NOT }
+  | "|"             { BITOR } 
+  | "<<"            { BITLEFT }
+  | ">>"            { BITRIGHT }
+  | "^"             { BITXOR }   
+  | "++"            { SELFINC }
+  | "--"            { SELFDEC }                     
   | '('             { LPAR }
   | ')'             { RPAR }
   | '{'             { LBRACE }

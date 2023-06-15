@@ -285,6 +285,10 @@ and cExpr (e: expr) (varEnv: VarEnv) (funEnv: FunEnv) : instr list =
     | CstS s -> 
         let s = (int s.Length)
         [ CSTI s ]
+    | CstF f ->
+        let bytes = System.BitConverter.GetBytes(float32(f))
+        let v = System.BitConverter.ToInt32(bytes, 0)
+        [ CSTI v ]
     | Addr acc -> cAccess acc varEnv funEnv
     | Prim1 (ope, e1) ->
         cExpr e1 varEnv funEnv
@@ -308,6 +312,11 @@ and cExpr (e: expr) (varEnv: VarEnv) (funEnv: FunEnv) : instr list =
              | ">=" -> [ LT; NOT ]
              | ">" -> [ SWAP; LT ]
              | "<=" -> [ SWAP; LT; NOT ]
+             | "&" -> [ BITAND ]
+             | "|" -> [ BITOR ]
+             | "^" -> [ BITXOR ]
+             | "<<" -> [ BITLEFT ]
+             | ">>" -> [ BITRIGHT ]
              | _ -> raise (Failure "unknown primitive 2"))
 
     | Prim3 (e1, e2, e3) ->
@@ -320,6 +329,19 @@ and cExpr (e: expr) (varEnv: VarEnv) (funEnv: FunEnv) : instr list =
             @ [ GOTO labend ]
               @ [ Label labelse ]
                 @ cExpr e3 varEnv funEnv  @ [ Label labend ]
+
+    | PreInc acc -> 
+        cAccess acc varEnv funEnv  
+            @ [DUP] @ [LDI] @ [CSTI 1] @ [ADD] @ [STI]
+    | PreDec acc -> 
+        cAccess acc varEnv funEnv  
+            @ [DUP] @ [LDI] @ [CSTI 1] @ [SUB] @ [STI] 
+    | NextInc acc ->
+        cAccess acc varEnv funEnv  
+            @ [DUP] @ [LDI] @ [SWAP] @ [DUP] @ [LDI] @ [CSTI 1] @ [ADD] @ [STI] @ [INCSP -1]
+    | NextDec acc ->
+        cAccess acc varEnv funEnv 
+            @ [DUP] @ [LDI] @ [SWAP] @ [DUP] @ [LDI] @ [CSTI -1] @ [ADD] @ [STI] @ [INCSP -1]
 
     | Andalso (e1, e2) ->
         let labend = newLabel ()
