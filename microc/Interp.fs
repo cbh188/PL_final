@@ -233,6 +233,10 @@ let initEnvAndStore (topdecs: topdec list) : locEnv * funEnv * store =
             let (locEnv1, sto1) = allocate (typ, x) locEnv store
             addv decr locEnv1 funEnv sto1
 
+        | VardecAndAssign (typ, x, e) :: decr ->
+            let (locEnv1, sto1) = allocate (typ, x) locEnv  store
+            addv decr locEnv1 funEnv  sto1
+
         //全局函数 将声明(f,(xs,body))添加到全局函数环境 funEnv
         | Fundec (_, f, xs, body) :: decr -> addv decr locEnv ((f, (xs, body)) :: funEnv) store
 
@@ -256,6 +260,23 @@ let rec exec stmt (locEnv: locEnv) (gloEnv: gloEnv) (store: store) : store =
         else
             exec stmt2 locEnv gloEnv store1 //False分支
 
+    | Switch (e, body) ->
+        let (v, store1) = eval e locEnv gloEnv  store
+        
+        let rec chooseCase caseList =
+            match caseList with
+            | Case (e1, body1):: tail -> 
+                let (v1, caseStore) = eval e1 locEnv gloEnv  store1
+                if v1 <> v then  // next case
+                    chooseCase tail
+                else  // exec case-stmt
+                    exec body1 locEnv gloEnv  caseStore
+            | Default body1 :: tail->
+                exec body1 locEnv gloEnv  store1
+            | [] -> store1
+            
+        chooseCase body
+
     | While (e, body) ->
 
         //定义 While循环辅助函数 loop
@@ -268,6 +289,30 @@ let rec exec stmt (locEnv: locEnv) (gloEnv: gloEnv) (store: store) : store =
             else
                 store2 //退出循环返回 环境store2
 
+        loop store
+
+    | For ( e1,e2,e3,body ) ->
+        //  e1: init
+        let (res , store0) = eval e1 locEnv gloEnv store
+        let rec loop store1 = 
+            //求值 循环条件
+            let (ifValue, store2) = eval e2 locEnv gloEnv store1
+            //  继续循环
+            if ifValue<>0 then let (oneend ,store3) = eval e3 locEnv gloEnv (exec body locEnv gloEnv store2)
+                               loop store3
+                          else store2   //退出循环 返回环境store2
+        loop store0
+
+    | DoWhile (body,e) ->
+        //定义DoWhile循环辅助函数 loop
+        let rec loop store1 =
+            //求值 循环条件,注意变更环境 store
+            let (v, store2) = eval e locEnv gloEnv store1
+            // 继续循环
+            if v <> 0 then
+                loop (exec body locEnv gloEnv store2)
+            else
+                store2 //退出循环返回 环境store2
         loop store
 
     | Expr e ->
@@ -287,13 +332,24 @@ let rec exec stmt (locEnv: locEnv) (gloEnv: gloEnv) (store: store) : store =
 
         loop stmts (locEnv, store)
 
-    | Return _ -> failwith "return not implemented" // 解释器没有实现 return
+    //| Return _ -> failwith "return not implemented" // 解释器没有实现 return
+    | Return e -> 
+        match e with
+        | Some e1 -> 
+            let (res, store0) = eval e1 locEnv gloEnv  store;
+            let store1 = store0.Add(-1, res);
+            store1
+        | None -> store
 
 and stmtordec stmtordec locEnv gloEnv store =
     match stmtordec with
     | Stmt stmt -> (locEnv, exec stmt locEnv gloEnv store)
     | Dec (typ, x) -> allocate (typ, x) locEnv store
-
+    | DecAndAssign (typ, x, e) ->
+        let (locEnv1, store1) = allocate (typ, x) locEnv  store
+        let (res, store2) = eval (Assign(AccVar x, e)) locEnv1 gloEnv  store1
+        (locEnv1, store2)
+        
 (* Evaluating micro-C expressions *)
 
 and eval e locEnv gloEnv store : int * store =
@@ -306,6 +362,12 @@ and eval e locEnv gloEnv store : int * store =
         let (res, store2) = eval e locEnv gloEnv store1
         (res, setSto store2 loc res)
     | CstI i -> (i, store)
+    | CstC c -> ((int c), store)
+    | CstS s -> (s.Length, store)   //len of string
+    | CstF f -> 
+        let bytes = System.BitConverter.GetBytes(float32(f))
+        let v = System.BitConverter.ToInt32(bytes, 0)
+        (v, store)
     | Addr acc -> access acc locEnv gloEnv store
     | Prim1 (ope, e1) ->
         let (i1, store1) = eval e1 locEnv gloEnv store
@@ -339,9 +401,37 @@ and eval e locEnv gloEnv store : int * store =
             | "<=" -> if i1 <= i2 then 1 else 0
             | ">=" -> if i1 >= i2 then 1 else 0
             | ">" -> if i1 > i2 then 1 else 0
+            | "&" -> i1 &&& i2
+            | "|" -> i1 ||| i2
+            | "^" -> i1 ^^^ i2
+            | "<<" -> i1 <<< i2
+            | ">>" -> i1 >>> i2
             | _ -> failwith ("unknown primitive " + ope)
 
         (res, store2)
+
+    | Prim3 (e1, e2, e3) ->
+        let (v, store1) = eval e1 locEnv gloEnv  store 
+        if v<>0 then eval e2 locEnv gloEnv  store1  // true-->e2
+                else eval e3 locEnv gloEnv  store1  // false-->e3
+
+    | PreInc acc -> 
+        let (loc, store1) = access acc locEnv gloEnv  store
+        let tmp = getSto store1 loc
+        (tmp + 1, setSto store1 loc (tmp + 1)) 
+    | PreDec acc -> 
+        let (loc, store1) = access acc locEnv gloEnv  store
+        let tmp = getSto store1 loc
+        (tmp - 1, setSto store1 loc (tmp - 1)) 
+    | NextInc acc ->
+        let (loc, store1) = access acc locEnv gloEnv  store
+        let tmp = getSto store1 loc
+        (tmp, setSto store1 loc (tmp + 1))
+    | NextDec acc -> 
+        let (loc, store1) = access acc locEnv gloEnv  store
+        let tmp = getSto store1 loc
+        (tmp, setSto store1 loc (tmp - 1))
+
     | Andalso (e1, e2) ->
         let (i1, store1) as res = eval e1 locEnv gloEnv store
 

@@ -12,25 +12,97 @@ open CPar  // Token 的定义位于语法分析模块中
 let lexemeAsString lexbuf = 
     LexBuffer<char>.LexemeString lexbuf
 
+// 进制函数
+let BinToDec value=
+    let rec binToList value n =
+        match value%10 with
+        | _ when value%10 >= 0 && value%10 < 2 -> if value=0 then n else binToList (value/10) ((value%10)::n)
+        | _        -> failwith "Type error:illegal bin type."
+    let rec pow n =
+        if n=0 then 1
+        else 2 * (pow (n-1))
+    let rec len xs =
+        match xs with
+        | []-> 0
+        | x::xr->1 + len xr
+    let rec eval (n: int list) =
+        match n with
+        | [] -> 0
+        | xr::yr -> xr * pow (len yr) + eval yr
+    eval (binToList value [])
+
+let OctToDec value=
+    let rec octToList value n =
+        match value%10 with
+        | _ when value%10 >= 0 && value%10 < 8 -> if value=0 then n else octToList (value/10) ((value%10)::n)
+        | _        -> failwith "Type error:illegal oct type."
+    let rec pow n =
+        if n=0 then 1
+        else 8 * (pow (n-1))
+    let rec len xs =
+        match xs with
+        | []-> 0
+        | x::xr->1 + len xr
+    let rec eval (n: int list) =
+        match n with
+        | [] -> 0
+        | xr::yr -> xr * pow (len yr) + eval yr
+    eval (octToList value [])
+
+let HexToDec value = 
+    let rec hexToList (str:string)  = 
+        if(str.Length <= 0) then []
+        else
+            match str.[0] with
+            | _ when str.[0] >='a' && str.[0] <= 'f'    -> (int str.[0]) - ( int 'a') + 10::hexToList str.[1..str.Length - 1]
+            | _ when str.[0] >= 'A' && str.[0] <= 'F'   -> (int str.[0]) - ( int 'A') + 10::hexToList str.[1..str.Length - 1]
+            | _ when str.[0] >= '0' && str.[0] <= '9'   -> (int str.[0]) - ( int '0') ::hexToList str.[1..str.Length - 1]
+            | _                                         -> failwith "Type error:illegal hex type."
+    let result = hexToList (value)
+    let mutable num = 0;
+    List.iter(fun i -> num <- num*16 + i)result
+    num
+
 (* Scan keywords as identifiers and use this function to distinguish them. *)
 (* If the set of keywords is large, use a hashtable instead.               *)
 // keyword 处理关键字与标识符的辅助函数
 let keyword s =   
     match s with
+    | "bool"    -> BOOL
     | "char"    -> CHAR    // 返回对应的Token ,Token 定义于 CPar.fsl 文件中
     | "else"    -> ELSE
     | "false"   -> CSTBOOL 0
     | "if"      -> IF
     | "int"     -> INT
+    | "Int"     -> INT
     | "null"    -> NULL
     | "print"   -> PRINT
     | "println" -> PRINTLN
     | "return"  -> RETURN
     | "true"    -> CSTBOOL 1
     | "void"    -> VOID 
-    | "while"   -> WHILE         
+    | "switch"  -> SWITCH  
+    | "case"    -> CASE    
+    | "default" -> DEFAULT  
+    | "for"     -> FOR
+    | "do"      -> DO
+    | "while"   -> WHILE
+    | "String"  -> STRING 
+    | "float"   -> FLOAT
     | _         -> NAME s   // 缺省情况，是标识符的名字，如 函数名，变量名等
                             // 当所有的关键字没有匹配成功时，则当成标识符
+
+// 进制关键词
+let Base (s:string) =
+    match s.[0..1] with
+    | "0B"
+    | "0b"
+    | "0O"
+    | "0o"
+    | "0X"
+    | "0x" ->   s.[2..(s.Length)-1] 
+    | _    ->   failwith "Lexer error: no such radix"
+
 // 字符串转义符处理函数
 let cEscape s = 
     match s with 
@@ -45,7 +117,8 @@ let cEscape s =
     | "\\r"  -> '\r'
     | _      -> failwith "Lexer error: impossible C escape"
 }
-                        
+
+
 rule Token = parse          // 每个 规则rule 会生成为一个函数，函数名是规则名 Token
   | [' ' '\t' '\r'] { Token lexbuf } 
                              // 变量是lexbuf 函数Token的默认参数，由外部程序构造
@@ -58,8 +131,16 @@ rule Token = parse          // 每个 规则rule 会生成为一个函数，函�
                             //  System.Int32.Parse 将 字符串转换为 int 类型
                             // 在 CPar 中  词元CSTINT 的语义值的类型是int  %token <int> CSTINT
                             //  CSTINT 需要一个整数作为参数
+  
+  | ['0'-'9']+'.'['0'-'9']+ 
+                    { CSTFLOAT (System.Single.Parse (lexemeAsString lexbuf)) }
 
-  | ['a'-'z''A'-'Z']['a'-'z''A'-'Z''0'-'9']*
+  | "0"['B''b']['0'-'1']+                { CSTINT (BinToDec(System.Int32.Parse (Base (lexemeAsString lexbuf))))}    
+  | "0"['O''o']['0'-'7']+                { CSTINT (OctToDec(System.Int32.Parse (Base (lexemeAsString lexbuf)))) }
+  | "0"['X''x']['0'-'9''A'-'F''a'-'f']+  { CSTINT (HexToDec(Base (lexemeAsString lexbuf)))}
+
+// 允许"_",但不允许"__"
+  | ['_''a'-'z''A'-'Z']['a'-'z''A'-'Z''0'-'9']*
                     { keyword (lexemeAsString lexbuf) } //标识符处理
                                                        //先查是否是关键字，是则返回对应关键字的Token
   | '+'             { PLUS }  // 返回Token PLUS 给调用词法分析器的程序，通常是Parser
@@ -78,7 +159,13 @@ rule Token = parse          // 每个 规则rule 会生成为一个函数，函�
   | "||"            { SEQOR }                     
   | "&&"            { SEQAND }                     
   | "&"             { AMP }                     
-  | "!"             { NOT }                     
+  | "!"             { NOT }
+  | "|"             { BITOR } 
+  | "<<"            { BITLEFT }
+  | ">>"            { BITRIGHT }
+  | "^"             { BITXOR }   
+  | "++"            { SELFINC }
+  | "--"            { SELFDEC }                     
   | '('             { LPAR }
   | ')'             { RPAR }
   | '{'             { LBRACE }
@@ -87,11 +174,14 @@ rule Token = parse          // 每个 规则rule 会生成为一个函数，函�
   | ']'             { RBRACK }
   | ';'             { SEMI }
   | ','             { COMMA }
+  | '?'             { QUES }
+  | ':'             { COLON }   // switch-case 三目
   | "//"            { EndLineComment lexbuf; Token lexbuf }  //单行注释处理规则，调用响应处理函数
                                                              //参数是 lexbuf
                                                              // 处理完后 lexbuf 内容已经更新，注释部分过滤
                                                              //调用 Token 规则函数继续注释部分后面的处理
   | "/*"            { Comment lexbuf; Token lexbuf }   // 多行注释，调用 Comment规则
+  | "(*"            { Comment lexbuf; Token lexbuf }   
   | '"'             { CSTSTRING (String [] lexbuf) }   // 调用字符串处理规则
   | eof             { EOF }
   | _               { failwith "Lexer error: illegal symbol" }
@@ -99,6 +189,8 @@ rule Token = parse          // 每个 规则rule 会生成为一个函数，函�
 and Comment = parse
    | "/*"           { Comment lexbuf; Comment lexbuf }  // 注释的嵌套处理
    | "*/"           { () }                           // 注释处理结束
+   | "(*"           { Comment lexbuf; Comment lexbuf } 
+   | "*)"           { () } 
    | '\n'           { lexbuf.EndPos <- lexbuf.EndPos.NextLine; Comment lexbuf } //注释跨行处理
    | (eof | '\026') { failwith "Lexer error: unterminated comment" }  // 多行注释未封闭
    | _              { Comment lexbuf }  // 其他任意情况都继续处理后续字符
