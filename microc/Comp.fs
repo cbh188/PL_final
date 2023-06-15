@@ -131,23 +131,6 @@ let bindParams paras ((env, newloc): VarEnv) : VarEnv = List.fold bindParam (env
 
 (* Build environments for global variables and functions *)
 
-let makeGlobalEnvs (topdecs: topdec list) : VarEnv * FunEnv * instr list =
-    let rec addv decs varEnv funEnv =
-
-        msg $"\nGlobal varEnv:\n{varEnv}\n"
-        msg $"\nGlobal funEnv:\n{funEnv}\n"
-
-        match decs with
-        | [] -> (varEnv, funEnv, [])
-        | dec :: decr ->
-            match dec with
-            | Vardec (typ, var) ->
-                let (varEnv1, code1) = allocateWithMsg Glovar (typ, var) varEnv
-                let (varEnvr, funEnvr, coder) = addv decr varEnv1 funEnv
-                (varEnvr, funEnvr, code1 @ coder)
-            | Fundec (tyOpt, f, xs, body) -> addv decr varEnv ((f, ($"{newLabel ()}_{f}", tyOpt, xs)) :: funEnv)
-
-    addv topdecs ([], 0) []
 
 
 (*
@@ -209,6 +192,11 @@ and cStmtOrDec stmtOrDec (varEnv: VarEnv) (funEnv: FunEnv) : VarEnv * instr list
     match stmtOrDec with
     | Stmt stmt -> (varEnv, cStmt stmt varEnv funEnv)
     | Dec (typ, x) -> allocateWithMsg Locvar (typ, x) varEnv
+    | DecAndAssign (typ, x, e) ->
+        let (varEnv1, code) = allocateWithMsg Locvar (typ, x) varEnv
+        //求值
+        let code2 = cExpr(Assign (AccVar x, e))  varEnv1 funEnv
+        (varEnv1, code @ code2 @ [INCSP -1])
 
 (* Compiling micro-C expressions:
 
@@ -277,6 +265,29 @@ and cExpr (e: expr) (varEnv: VarEnv) (funEnv: FunEnv) : instr list =
                 Label labend ]
     | Call (f, es) -> callfun f es varEnv funEnv
 
+and makeGlobalEnvs (topdecs: topdec list) : VarEnv * FunEnv * instr list =
+    let rec addv decs varEnv funEnv =
+
+        msg $"\nGlobal varEnv:\n{varEnv}\n"
+        msg $"\nGlobal funEnv:\n{funEnv}\n"
+
+        match decs with
+        | [] -> (varEnv, funEnv, [])
+        | dec :: decr ->
+            match dec with
+            | Vardec (typ, var) ->
+                let (varEnv1, code1) = allocateWithMsg Glovar (typ, var) varEnv
+                let (varEnvr, funEnvr, coder) = addv decr varEnv1 funEnv
+                (varEnvr, funEnvr, code1 @ coder)
+            | VardecAndAssign (typ, x, e) -> 
+                let (varEnv1, code1) = allocateWithMsg Glovar (typ, x) varEnv 
+                let (varEnvr, funEnvr, coder) = addv decr varEnv1 funEnv 
+                let code2 = cAccess (AccVar x) varEnvr funEnvr 
+                (varEnvr, funEnvr, code1 @ coder @ code2)
+            | Fundec (tyOpt, f, xs, body) -> addv decr varEnv ((f, ($"{newLabel ()}_{f}", tyOpt, xs)) :: funEnv)
+
+    addv topdecs ([], 0) []
+
 (* Generate code to access variable, dereference pointer or index array.
    The effect of the compiled code is to leave an lvalue on the stack.   *)
 
@@ -342,7 +353,8 @@ let cProgram (Prog topdecs) : instr list =
         List.choose
             (function
             | Fundec (rTy, name, argTy, body) -> Some(compilefun (rTy, name, argTy, body))
-            | Vardec _ -> None)
+            | Vardec _ -> None
+            | VardecAndAssign _ -> None)
             topdecs
 
     let (mainlab, _, mainparams) = lookup funEnv "main"

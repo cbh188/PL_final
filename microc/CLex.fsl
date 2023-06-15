@@ -12,6 +12,7 @@ open CPar  // Token 的定义位于语法分析模块中
 let lexemeAsString lexbuf = 
     LexBuffer<char>.LexemeString lexbuf
 
+
 (* Scan keywords as identifiers and use this function to distinguish them. *)
 (* If the set of keywords is large, use a hashtable instead.               *)
 // keyword 处理关键字与标识符的辅助函数
@@ -22,6 +23,7 @@ let keyword s =
     | "false"   -> CSTBOOL 0
     | "if"      -> IF
     | "int"     -> INT
+    | "Int"     -> INT
     | "null"    -> NULL
     | "print"   -> PRINT
     | "println" -> PRINTLN
@@ -45,7 +47,9 @@ let cEscape s =
     | "\\r"  -> '\r'
     | _      -> failwith "Lexer error: impossible C escape"
 }
-                        
+
+
+
 rule Token = parse          // 每个 规则rule 会生成为一个函数，函数名是规则名 Token
   | [' ' '\t' '\r'] { Token lexbuf } 
                              // 变量是lexbuf 函数Token的默认参数，由外部程序构造
@@ -59,7 +63,8 @@ rule Token = parse          // 每个 规则rule 会生成为一个函数，函�
                             // 在 CPar 中  词元CSTINT 的语义值的类型是int  %token <int> CSTINT
                             //  CSTINT 需要一个整数作为参数
 
-  | ['a'-'z''A'-'Z']['a'-'z''A'-'Z''0'-'9']*
+// 允许"_",但不允许"__"
+  | ['_''a'-'z''A'-'Z']['a'-'z''A'-'Z''0'-'9']*
                     { keyword (lexemeAsString lexbuf) } //标识符处理
                                                        //先查是否是关键字，是则返回对应关键字的Token
   | '+'             { PLUS }  // 返回Token PLUS 给调用词法分析器的程序，通常是Parser
