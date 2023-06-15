@@ -158,6 +158,7 @@ let rec dellab labs =
         | lab :: tr ->   tr
         | []        ->   []
 
+
 let rec cStmt stmt (varEnv: VarEnv) (funEnv: FunEnv) : instr list =
     match stmt with
     | If (e, stmt1, stmt2) ->
@@ -319,7 +320,8 @@ and cExpr (e: expr) (varEnv: VarEnv) (funEnv: FunEnv) : instr list =
              | ">>" -> [ BITRIGHT ]
              | _ -> raise (Failure "unknown primitive 2"))
 
-    | Prim3 (e1, e2, e3) ->
+
+    | Prim3 (e1, e2, e3) -> //work
         let labelse = newLabel ()
         let labend = newLabel ()
 
@@ -328,7 +330,8 @@ and cExpr (e: expr) (varEnv: VarEnv) (funEnv: FunEnv) : instr list =
           @ cExpr e2 varEnv funEnv 
             @ [ GOTO labend ]
               @ [ Label labelse ]
-                @ cExpr e3 varEnv funEnv  @ [ Label labend ]
+                @ cExpr e3 varEnv funEnv  
+                    @ [ Label labend ]
 
     | PreInc acc -> 
         cAccess acc varEnv funEnv  
@@ -342,6 +345,8 @@ and cExpr (e: expr) (varEnv: VarEnv) (funEnv: FunEnv) : instr list =
     | NextDec acc ->
         cAccess acc varEnv funEnv 
             @ [DUP] @ [LDI] @ [SWAP] @ [DUP] @ [LDI] @ [CSTI -1] @ [ADD] @ [STI] @ [INCSP -1]
+
+
 
     | Andalso (e1, e2) ->
         let labend = newLabel ()
