@@ -279,6 +279,12 @@ and cExpr (e: expr) (varEnv: VarEnv) (funEnv: FunEnv) : instr list =
         cAccess acc varEnv funEnv
         @ cExpr e varEnv funEnv @ [ STI ]
     | CstI i -> [ CSTI i ]
+    | CstC c -> 
+        let c = (int c)
+        [ CSTI c ]
+    | CstS s -> 
+        let s = (int s.Length)
+        [ CSTI s ]
     | Addr acc -> cAccess acc varEnv funEnv
     | Prim1 (ope, e1) ->
         cExpr e1 varEnv funEnv
