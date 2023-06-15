@@ -2,6 +2,11 @@
 module CPar
 type token = 
   | EOF
+  | BITXOR
+  | BITOR
+  | BITAND
+  | BITLEFT
+  | BITRIGHT
   | LPAR
   | RPAR
   | LBRACE
@@ -38,6 +43,10 @@ type token =
   | RETURN
   | VOID
   | STRING
+  | BOOL
+  | FLOAT
+  | SELFINC
+  | SELFDEC
   | WHILE
   | FOR
   | DO
@@ -45,6 +54,7 @@ type token =
   | SWITCH
   | CASE
   | DEFAULT
+  | CSTFLOAT of (float32)
   | CSTCHAR of (char)
   | CSTSTRING of (string)
   | NAME of (string)
@@ -52,6 +62,11 @@ type token =
   | CSTBOOL of (int)
 type tokenId = 
     | TOKEN_EOF
+    | TOKEN_BITXOR
+    | TOKEN_BITOR
+    | TOKEN_BITAND
+    | TOKEN_BITLEFT
+    | TOKEN_BITRIGHT
     | TOKEN_LPAR
     | TOKEN_RPAR
     | TOKEN_LBRACE
@@ -88,6 +103,10 @@ type tokenId =
     | TOKEN_RETURN
     | TOKEN_VOID
     | TOKEN_STRING
+    | TOKEN_BOOL
+    | TOKEN_FLOAT
+    | TOKEN_SELFINC
+    | TOKEN_SELFDEC
     | TOKEN_WHILE
     | TOKEN_FOR
     | TOKEN_DO
@@ -95,6 +114,7 @@ type tokenId =
     | TOKEN_SWITCH
     | TOKEN_CASE
     | TOKEN_DEFAULT
+    | TOKEN_CSTFLOAT
     | TOKEN_CSTCHAR
     | TOKEN_CSTSTRING
     | TOKEN_NAME
@@ -128,6 +148,7 @@ type nonTerminalId =
     | NONTERM_Const
     | NONTERM_ConstChar
     | NONTERM_ConstString
+    | NONTERM_ConstFloat
     | NONTERM_Type
 /// This function maps tokens to integer indexes
 val tagOfToken: token -> int

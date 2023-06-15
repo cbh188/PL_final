@@ -332,7 +332,14 @@ let rec exec stmt (locEnv: locEnv) (gloEnv: gloEnv) (store: store) : store =
 
         loop stmts (locEnv, store)
 
-    | Return _ -> failwith "return not implemented" // 解释器没有实现 return
+    //| Return _ -> failwith "return not implemented" // 解释器没有实现 return
+    | Return e -> 
+        match e with
+        | Some e1 -> 
+            let (res, store0) = eval e1 locEnv gloEnv  store;
+            let store1 = store0.Add(-1, res);
+            store1
+        | None -> store
 
 and stmtordec stmtordec locEnv gloEnv store =
     match stmtordec with
@@ -357,6 +364,10 @@ and eval e locEnv gloEnv store : int * store =
     | CstI i -> (i, store)
     | CstC c -> ((int c), store)
     | CstS s -> (s.Length, store)   //len of string
+    | CstF f -> 
+        let bytes = System.BitConverter.GetBytes(float32(f))
+        let v = System.BitConverter.ToInt32(bytes, 0)
+        (v, store)
     | Addr acc -> access acc locEnv gloEnv store
     | Prim1 (ope, e1) ->
         let (i1, store1) = eval e1 locEnv gloEnv store
@@ -390,6 +401,11 @@ and eval e locEnv gloEnv store : int * store =
             | "<=" -> if i1 <= i2 then 1 else 0
             | ">=" -> if i1 >= i2 then 1 else 0
             | ">" -> if i1 > i2 then 1 else 0
+            | "&" -> i1 &&& i2
+            | "|" -> i1 ||| i2
+            | "^" -> i1 ^^^ i2
+            | "<<" -> i1 <<< i2
+            | ">>" -> i1 >>> i2
             | _ -> failwith ("unknown primitive " + ope)
 
         (res, store2)
@@ -399,6 +415,22 @@ and eval e locEnv gloEnv store : int * store =
         if v<>0 then eval e2 locEnv gloEnv  store1  // true-->e2
                 else eval e3 locEnv gloEnv  store1  // false-->e3
 
+    | PreInc acc -> 
+        let (loc, store1) = access acc locEnv gloEnv  store
+        let tmp = getSto store1 loc
+        (tmp + 1, setSto store1 loc (tmp + 1)) 
+    | PreDec acc -> 
+        let (loc, store1) = access acc locEnv gloEnv  store
+        let tmp = getSto store1 loc
+        (tmp - 1, setSto store1 loc (tmp - 1)) 
+    | NextInc acc ->
+        let (loc, store1) = access acc locEnv gloEnv  store
+        let tmp = getSto store1 loc
+        (tmp, setSto store1 loc (tmp + 1))
+    | NextDec acc -> 
+        let (loc, store1) = access acc locEnv gloEnv  store
+        let tmp = getSto store1 loc
+        (tmp, setSto store1 loc (tmp - 1))
 
     | Andalso (e1, e2) ->
         let (i1, store1) as res = eval e1 locEnv gloEnv store
