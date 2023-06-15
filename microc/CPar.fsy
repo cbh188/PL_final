@@ -22,10 +22,11 @@ let third  (_, _, c) = c
 
 %token <int> CSTINT CSTBOOL  // <int> 是词元的语义值类型
 %token <string> CSTSTRING NAME
+%token <char> CSTCHAR
 
 %token IF SWITCH CASE DEFAULT
 %token WHILE FOR DO
-%token CHAR ELSE INT NULL PRINT PRINTLN RETURN VOID
+%token CHAR ELSE INT NULL PRINT PRINTLN RETURN VOID STRING 
 %token PLUS MINUS TIMES DIV MOD
 %token EQ NE GT LT GE LE
 %token NOT SEQOR SEQAND
@@ -200,12 +201,15 @@ ExprNotAccess:
   | Expr QUES Expr COLON Expr           { Prim3($1, $3, $5)   } //  三目
 ;
 
+
 AtExprNotAccess:
     //不可以为左值的的基本情况 
     // Const ,  3
     // AMP Access  , &x
     // (3)   
     Const                               { CstI $1             }
+  | ConstChar                           { CstC $1             }
+  | ConstString                         { CstS $1             }
   | LPAR ExprNotAccess RPAR             { $2                  } 
   | AMP Access                          { Addr $2             } // 取地址
 ;
@@ -235,7 +239,16 @@ Const:
   | NULL                                { -1       }
 ;
 
+ConstChar:
+    CSTCHAR                             { $1       }
+;
+
+ConstString:
+    CSTSTRING                           { $1       }
+;
+
 Type:
     INT                                 { TypI     }
   | CHAR                                { TypC     }
+  | STRING                              { TypS     }
 ;

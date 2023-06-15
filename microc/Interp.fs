@@ -355,6 +355,8 @@ and eval e locEnv gloEnv store : int * store =
         let (res, store2) = eval e locEnv gloEnv store1
         (res, setSto store2 loc res)
     | CstI i -> (i, store)
+    | CstC c -> ((int c), store)
+    | CstS s -> (s.Length, store)   //len of string
     | Addr acc -> access acc locEnv gloEnv store
     | Prim1 (ope, e1) ->
         let (i1, store1) = eval e1 locEnv gloEnv store
@@ -396,6 +398,7 @@ and eval e locEnv gloEnv store : int * store =
         let (v, store1) = eval e1 locEnv gloEnv  store 
         if v<>0 then eval e2 locEnv gloEnv  store1  // true-->e2
                 else eval e3 locEnv gloEnv  store1  // false-->e3
+
 
     | Andalso (e1, e2) ->
         let (i1, store1) as res = eval e1 locEnv gloEnv store
