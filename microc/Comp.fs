@@ -346,6 +346,9 @@ and cExpr (e: expr) (varEnv: VarEnv) (funEnv: FunEnv) : instr list =
         cAccess acc varEnv funEnv 
             @ [DUP] @ [LDI] @ [SWAP] @ [DUP] @ [LDI] @ [CSTI -1] @ [ADD] @ [STI] @ [INCSP -1]
 
+    | Addnum acc ->
+        cAccess acc varEnv funEnv
+            @[DUP] @[LDI] @[cAccess acc varEnv funEnv] @[ADD] @[STI]
 
 
     | Andalso (e1, e2) ->
