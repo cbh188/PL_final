@@ -23,15 +23,18 @@ let third  (_, _, c) = c
 %token <int> CSTINT CSTBOOL  // <int> 是词元的语义值类型
 %token <string> CSTSTRING NAME
 
-%token CHAR ELSE IF INT NULL PRINT PRINTLN RETURN VOID WHILE
+%token IF SWITCH CASE DEFAULT
+%token WHILE FOR DO
+%token CHAR ELSE INT NULL PRINT PRINTLN RETURN VOID
 %token PLUS MINUS TIMES DIV MOD
 %token EQ NE GT LT GE LE
 %token NOT SEQOR SEQAND
-%token LPAR RPAR LBRACE RBRACE LBRACK RBRACK SEMI COMMA ASSIGN AMP
+%token LPAR RPAR LBRACE RBRACE LBRACK RBRACK SEMI COMMA ASSIGN AMP POINT COLON QUES
 %token EOF
 
 %right ASSIGN             /* lowest precedence */  // 最下面的优先级最高
 %nonassoc PRINT
+%nonassoc COLON QUES // ? :
 %left SEQOR
 %left SEQAND
 %left EQ NE 
@@ -151,7 +154,17 @@ StmtM:  /* No unbalanced if-else */
   | Block                               { $1                   }
   | IF LPAR Expr RPAR StmtM ELSE StmtM  { If($3, $5, $7)       }
   | WHILE LPAR Expr RPAR StmtM          { While($3, $5)        }
+  | SWITCH LPAR Expr RPAR LBRACE CaseStmt RBRACE  { Switch($3,$6)  }
+  | FOR LPAR Expr SEMI Expr SEMI Expr RPAR StmtM  { For($3, $5, $7, $9) }
+  | DO StmtM WHILE LPAR Expr RPAR SEMI  { DoWhile($2, $5)      }
 ;
+
+CaseStmt:
+    CASE AtExprNotAccess COLON StmtM      { [Case($2, $4)]   } 
+  | DEFAULT COLON StmtM                   { [Default($3)]    }
+  | CASE AtExprNotAccess COLON StmtM CaseStmt      { [Case($2, $4)] @ $5 }
+;
+
 
 StmtU:
     IF LPAR Expr RPAR StmtM ELSE StmtU  { If($3, $5, $7)       }
@@ -184,6 +197,7 @@ ExprNotAccess:
   | Expr LE    Expr                     { Prim2("<=", $1, $3) }
   | Expr SEQAND Expr                    { Andalso($1, $3)     }
   | Expr SEQOR  Expr                    { Orelse($1, $3)      }
+  | Expr QUES Expr COLON Expr           { Prim3($1, $3, $5)   } //  三目
 ;
 
 AtExprNotAccess:

@@ -150,6 +150,14 @@ let x86patch code =
    * funEnv  is the global function environment
 *)
 
+let mutable lablist : label list = []
+
+// 去头
+let rec dellab labs =
+    match labs with
+        | lab :: tr ->   tr
+        | []        ->   []
+
 let rec cStmt stmt (varEnv: VarEnv) (funEnv: FunEnv) : instr list =
     match stmt with
     | If (e, stmt1, stmt2) ->
@@ -162,6 +170,23 @@ let rec cStmt stmt (varEnv: VarEnv) (funEnv: FunEnv) : instr list =
             @ [ GOTO labend ]
               @ [ Label labelse ]
                 @ cStmt stmt2 varEnv funEnv @ [ Label labend ]
+    
+    | Switch (e, body) ->
+        let eValueInstr = cExpr e varEnv funEnv 
+        let lab = newLabel()
+        let rec getcode e body = 
+            match body with
+            | Case (e1, body1):: tail -> 
+              let e1ValueInstr = cExpr e1 varEnv funEnv 
+              let sublab = newLabel()
+              eValueInstr @ e1ValueInstr @ [SUB] @ [IFNZRO sublab] @ cStmt body1 varEnv funEnv  @ [GOTO lab] @ [Label sublab] @ getcode e tail
+            | Default body1 :: tail->
+                cStmt body1 varEnv funEnv 
+            | []          -> [INCSP 0]
+      
+        let result = getcode e body @ [Label lab]
+        result
+
     | While (e, body) ->
         let labbegin = newLabel ()
         let labtest = newLabel ()
@@ -170,6 +195,43 @@ let rec cStmt stmt (varEnv: VarEnv) (funEnv: FunEnv) : instr list =
         @ cStmt body varEnv funEnv
           @ [ Label labtest ]
             @ cExpr e varEnv funEnv @ [ IFNZRO labbegin ]
+
+    | For (e1, e2, e3, body) ->
+        let labbegin = newLabel ()
+        let labtest = newLabel ()
+        let labend = newLabel ()
+        lablist <- [labend; labtest; labbegin] @ lablist
+
+        let instr = 
+            cExpr e1 varEnv funEnv 
+             @ [INCSP -1] @ [ GOTO labtest; Label labbegin ]
+                  @ cStmt body varEnv funEnv 
+                    @ cExpr e3 varEnv funEnv  @ [INCSP -1]
+                        @ [ Label labtest ]
+                            @ cExpr e2 varEnv funEnv  @ [ IFNZRO labbegin; Label labend ]
+        lablist <- dellab lablist
+        lablist <- dellab lablist
+        lablist <- dellab lablist
+        instr
+    
+    | DoWhile (body, e) ->
+        let labbegin = newLabel ()
+        let labtest = newLabel ()
+        let labend = newLabel ()
+        lablist <- [labend; labtest; labbegin] @ lablist
+
+        let instr = 
+            cStmt body varEnv funEnv 
+            @[ GOTO labtest; Label labbegin ]
+              @ cStmt body varEnv funEnv 
+                @ [ Label labtest ]
+                    //@ cExpr e varEnv funEnv structEnv @ [ IFNZRO labbegin ]
+                    @ cExpr e varEnv funEnv  @ [ IFNZRO labbegin; Label labend ]
+        lablist <- dellab lablist
+        lablist <- dellab lablist
+        lablist <- dellab lablist
+        instr
+
     | Expr e -> cExpr e varEnv funEnv @ [ INCSP -1 ]
     | Block stmts ->
 
@@ -241,6 +303,18 @@ and cExpr (e: expr) (varEnv: VarEnv) (funEnv: FunEnv) : instr list =
              | ">" -> [ SWAP; LT ]
              | "<=" -> [ SWAP; LT; NOT ]
              | _ -> raise (Failure "unknown primitive 2"))
+
+    | Prim3 (e1, e2, e3) ->
+        let labelse = newLabel ()
+        let labend = newLabel ()
+
+        cExpr e1 varEnv funEnv 
+        @ [ IFZERO labelse ]
+          @ cExpr e2 varEnv funEnv 
+            @ [ GOTO labend ]
+              @ [ Label labelse ]
+                @ cExpr e3 varEnv funEnv  @ [ Label labend ]
+
     | Andalso (e1, e2) ->
         let labend = newLabel ()
         let labfalse = newLabel ()

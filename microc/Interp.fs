@@ -260,6 +260,23 @@ let rec exec stmt (locEnv: locEnv) (gloEnv: gloEnv) (store: store) : store =
         else
             exec stmt2 locEnv gloEnv store1 //False分支
 
+    | Switch (e, body) ->
+        let (v, store1) = eval e locEnv gloEnv  store
+        
+        let rec chooseCase caseList =
+            match caseList with
+            | Case (e1, body1):: tail -> 
+                let (v1, caseStore) = eval e1 locEnv gloEnv  store1
+                if v1 <> v then  // next case
+                    chooseCase tail
+                else  // exec case-stmt
+                    exec body1 locEnv gloEnv  caseStore
+            | Default body1 :: tail->
+                exec body1 locEnv gloEnv  store1
+            | [] -> store1
+            
+        chooseCase body
+
     | While (e, body) ->
 
         //定义 While循环辅助函数 loop
@@ -272,6 +289,30 @@ let rec exec stmt (locEnv: locEnv) (gloEnv: gloEnv) (store: store) : store =
             else
                 store2 //退出循环返回 环境store2
 
+        loop store
+
+    | For ( e1,e2,e3,body ) ->
+        //  e1: init
+        let (res , store0) = eval e1 locEnv gloEnv store
+        let rec loop store1 = 
+            //求值 循环条件
+            let (ifValue, store2) = eval e2 locEnv gloEnv store1
+            //  继续循环
+            if ifValue<>0 then let (oneend ,store3) = eval e3 locEnv gloEnv (exec body locEnv gloEnv store2)
+                               loop store3
+                          else store2   //退出循环 返回环境store2
+        loop store0
+
+    | DoWhile (body,e) ->
+        //定义DoWhile循环辅助函数 loop
+        let rec loop store1 =
+            //求值 循环条件,注意变更环境 store
+            let (v, store2) = eval e locEnv gloEnv store1
+            // 继续循环
+            if v <> 0 then
+                loop (exec body locEnv gloEnv store2)
+            else
+                store2 //退出循环返回 环境store2
         loop store
 
     | Expr e ->
@@ -350,6 +391,12 @@ and eval e locEnv gloEnv store : int * store =
             | _ -> failwith ("unknown primitive " + ope)
 
         (res, store2)
+
+    | Prim3 (e1, e2, e3) ->
+        let (v, store1) = eval e1 locEnv gloEnv  store 
+        if v<>0 then eval e2 locEnv gloEnv  store1  // true-->e2
+                else eval e3 locEnv gloEnv  store1  // false-->e3
+
     | Andalso (e1, e2) ->
         let (i1, store1) as res = eval e1 locEnv gloEnv store
 
