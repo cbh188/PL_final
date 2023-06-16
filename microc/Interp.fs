@@ -410,6 +410,7 @@ and eval e locEnv gloEnv store : int * store =
 
         (res, store2)
 
+
     | Prim3 (e1, e2, e3) ->
         let (v, store1) = eval e1 locEnv gloEnv  store 
         if v<>0 then eval e2 locEnv gloEnv  store1  // true-->e2
@@ -431,6 +432,10 @@ and eval e locEnv gloEnv store : int * store =
         let (loc, store1) = access acc locEnv gloEnv  store
         let tmp = getSto store1 loc
         (tmp, setSto store1 loc (tmp - 1))
+
+//  | Addnum acc ->
+
+
 
     | Andalso (e1, e2) ->
         let (i1, store1) as res = eval e1 locEnv gloEnv store
